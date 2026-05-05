@@ -1,8 +1,21 @@
 # Python
 venv/
-python/venv/
 __pycache__/
 *.pyc
+
+# Model files
+*.pt
+
+# Node (dashboard)
+dashboard/node_modules/
+
+# Go
+bin/
+*.out
+coverage.out
+
+# Environment
+.env
 
 # OS
 .DS_Store
