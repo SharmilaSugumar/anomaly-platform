@@ -1,0 +1,19 @@
+# Python
+venv/
+python/venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Binaries
+*.exe

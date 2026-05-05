@@ -1,0 +1,82 @@
+package pipeline
+
+import (
+    "bytes"
+    "context"
+    "image/jpeg"
+    "log"
+    "time"
+
+    "gocv.io/x/gocv"
+    "github.com/sharm/anomaly-platform/internal/models"
+)
+
+// RTSPReader connects to a camera stream and feeds frames into the pipeline.
+// Run one goroutine per camera: go RTSPReader(ctx, rtspURL, camID, frames, 3)
+func RTSPReader(
+    ctx context.Context,
+    rtspURL string,
+    camID string,
+    out chan<- models.Frame,
+    skipN int,  // process every Nth frame (3 = 66% CPU reduction)
+) {
+    cap, err := gocv.OpenVideoCapture(rtspURL)
+    if err != nil {
+        log.Printf("[Ingest] Failed to open %s: %v", rtspURL, err)
+        return
+    }
+    defer cap.Close()
+    log.Printf("[Ingest] Camera %s connected: %s", camID, rtspURL)
+
+    mat := gocv.NewMat()
+    defer mat.Close()
+
+    frameCount := 0
+    for {
+        select {
+        case <-ctx.Done():
+            log.Printf("[Ingest] Camera %s shutting down", camID)
+            return
+        default:
+        }
+
+        // Read next frame from stream
+        if ok := cap.Read(&mat); !ok || mat.Empty() {
+            log.Printf("[Ingest] Camera %s: stream ended or frame empty, retrying...", camID)
+            time.Sleep(500 * time.Millisecond)
+            continue
+        }
+
+        frameCount++
+        // Frame skip — only process every Nth frame
+        if frameCount%skipN != 0 {
+            continue
+        }
+
+        // Resize to 640x640 (YOLO input size)
+        resized := gocv.NewMat()
+        gocv.Resize(mat, &resized, image.Point{X: 640, Y: 640}, 0, 0, gocv.InterpolationLinear)
+
+        // Encode frame as JPEG bytes for gRPC transport
+        imgBytes, err := gocv.IMEncode(gocv.JPEGFileExt, resized)
+        resized.Close()
+        if err != nil {
+            log.Printf("[Ingest] Encode error cam=%s: %v", camID, err)
+            continue
+        }
+
+        frame := models.Frame{
+            Data:  imgBytes.GetBytes(),
+            CamID: camID,
+            TS:    time.Now(),
+        }
+        imgBytes.Close()
+
+        // Non-blocking send — drop frame if preprocess is backed up
+        select {
+        case out <- frame:
+        default:
+            // backpressure: downstream is slow, skip this frame
+        }
+    }
+}

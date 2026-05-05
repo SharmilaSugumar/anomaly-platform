@@ -1,0 +1,15 @@
+deployment: traffic_junction_main
+camera_fps: 15
+frame_skip: 1
+
+zones:
+  - name: main_lane_a
+    polygon:
+      - [0, 0]
+      - [640, 0]
+      - [640, 640]
+      - [0, 640]
+    speed_limit_kmh: 0.0001
+    required_class: person
+    score_threshold: 10
+    pixels_per_meter: 8.5

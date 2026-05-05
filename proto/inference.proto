@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+option go_package = "github.com/sharm/anomaly-platform/proto/inference";
+package inference;
+
+// A single video frame sent from Go to Python
+message FrameRequest {
+  bytes  image_bytes = 1;  // raw 640x640 JPEG/PNG bytes
+  string camera_id   = 2;  // which camera this came from
+  int64  timestamp   = 3;  // Unix milliseconds
+}
+
+// A single bounding box
+message BoundingBox {
+  float x1 = 1;
+  float y1 = 2;
+  float x2 = 3;
+  float y2 = 4;
+}
+
+// One detected and tracked object
+message Detection {
+  int32       track_id   = 1;  // ByteTrack persistent ID
+  string      class_name = 2;  // "person", "car", "bike"
+  float       confidence = 3;  // 0.0 to 1.0
+  BoundingBox bbox       = 4;
+  float       cx         = 5;  // centre x pixel
+  float       cy         = 6;  // centre y pixel
+}
+
+// Python returns this after running YOLO on the frame
+message DetectionResponse {
+  string             camera_id  = 1;
+  repeated Detection detections = 2;  // could be 0 detections
+  int64              latency_ms = 3;  // Python inference time
+}
+
+// The single RPC method
+service InferenceService {
+  rpc Detect(FrameRequest) returns (DetectionResponse);
+}
